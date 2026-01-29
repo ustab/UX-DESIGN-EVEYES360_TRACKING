@@ -46,6 +46,18 @@ post_stress_score: Seans sonrası (kullanıcının girdiği veya AI'nın ölçt�
 """
 import streamlit as st
 import pandas as pd # Verileri tablo yapmak için
+
+# --- 1. AYARLAR VE TASARIM ---
+st.set_page_config(page_title="EVEYES 360 - NUC Accreditation", layout="wide")
+
+# CSS Düzenlemesi (Koyu Mavi ve Profesyonel Görünüm)
+st.markdown("""
+    <style>
+    .main { background-color: #f0f2f6; }
+    .stMetric { background-color: #ffffff; padding: 20px; border-radius: 15px; border: 1px solid #3498db; box-shadow: 2px 2px 10px rgba(0,0,0,0.1); }
+    </style>
+    """, unsafe_allow_html=True)
+
 import os
 from fastapi import FastAPI
 from pydantic import BaseModel
