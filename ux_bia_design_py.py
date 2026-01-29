@@ -44,7 +44,9 @@ applied_aroma: Önerilen ve kullanılan koku (Leylak, Gül vb.)
 pre_stress_score: Seans öncesi stres puanı
 post_stress_score: Seans sonrası (kullanıcının girdiği veya AI'nın ölçtüğü) yeni puan
 """
-
+import streamlit as st
+import pandas as pd # Verileri tablo yapmak için
+import os
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional
