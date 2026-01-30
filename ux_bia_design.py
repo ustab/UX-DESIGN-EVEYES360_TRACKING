@@ -15,6 +15,20 @@ engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine) # Düzeltildi: bind=engine aktif edildi
 Base = declarative_base()
 
+# --- 3. API TANIMLAMALARI ---
+app = FastAPI(title="EVEYES 360 Professional API")
+core = EVEYES360_Biosonology(hospital_name="Şehir Hastanesi")
+# --- 4. API ENDPOINT (ANA GİRİŞ) ---
+app = FastAPI() 
+@app.post("/api/v1/analyze-condition")
+# --- 3. API MODELLEMESİ ---
+app = FastAPI(title="EVEYES 360 Professional API")
+# --- 4. API ENDPOINT'LERİ ---
+@app.post("/api/v1/analyze")
+async def perform_analysis(req: AnalysisRequest):
+    db = SessionLocal()
+    final_stress = 0
+
 class TherapySession(Base):
     __tablename__ = "therapy_sessions"
     id = Column(Integer, primary_key=True, index=True)
@@ -45,228 +59,6 @@ class EVEYES360_Biosonology:
                   "restore this biological harmony and balance the Phase Angle."
         }
         return articles.get(lang, articles["en"])
-
-# --- 3. API TANIMLAMALARI ---
-app = FastAPI(title="EVEYES 360 Professional API")
-core = EVEYES360_Biosonology(hospital_name="Şehir Hastanesi")
-# --- 2. ANALİZ MODELLERİ ---
-class AnalysisRequest(BaseModel):
-    patient_name: str
-    resistance: float
-    reactance: float
-    facial_mood: Optional[str] = "neutral"
-    lang: str = "tr"
-# --- 3. CORE LOGIC (Biyosonoloji & Selçuklu Tıbbı) ---
-
-def get_therapy_logic(pa: float, mood: str):
-    """Biyosonoloji verilerini Selçuklu makam terapisiyle eşleştirir."""
-    if pa < 5.0 or mood in ["anxious", "sad"]:
-        return {
-            "makam": "Hicaz", 
-            "scent": "Gül Yağı", 
-            "note": "Hücresel ödem tespiti. Hicaz makamı ve Gül aroması ile dengeleme önerilir."
-        }
-    return {
-        "makam": "Rast", 
-        "scent": "Sandal Ağacı", 
-        "note": "Hücresel vibrasyon stabil. Rast makamı ile zindelik desteklenir."
-    }
-# --- 4. API ENDPOINT (ANA GİRİŞ) ---
-app = FastAPI() 
-@app.post("/api/v1/analyze-condition")
-async def analyze_condition(req: AnalysisRequest):
-    engine_logic = EVEYES360_Engine()
-# BIA Analizi
-
-    pa = core.analyze_bia(req.resistance, req.reactance)
-    
-    # Diyelim ki BIA ölçümü 4.2 çıktı (Düşük/Ödemli)
-
-    # Terapi Karar Mekanizması
-    if pa < 5.0 or req.facial_mood in ["anxious", "depressed"]:
-        makam, scent = "Hicaz", "Gül Yağı"
-        status = "Kritik (Ödem / Düşük Titreşim)"
-        desc = "Hicaz makamı ve Gül yağı ile hücresel boşaltım ve sakinleşme önerilir."
-    else:
-        makam, scent = "Rast", "Sandal Ağacı"
-        status = "Stabil (Hücresel Denge)"
-        desc = "Rast makamı ve Sandal ağacı ile canlılık ve neşe desteklenir."
-   
-    therapy = core.therapy_db[res_key]
-    selected_makam = therapy["makam"]
-    scent = therapy["scent"]
-    therapy = get_therapy_logic(pa, req.facial_mood)
-    db = SessionLocal()
-    try:
-        new_log = TherapyLog(
-            patient_name=req.patient_name,
-            phase_angle=pa,
-            suggested_makam=makam,
-            scent=scent,
-            status=status
-        )
-        db.add(new_log)
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        return {"error": "Veritabanı hatası", "detail": str(e)}
-    finally:
-        db.close()
-    # DB Kayıt
-    db = SessionLocal()
-    new_log = TherapyLog(patient_name=req.patient_name, phase_angle=pa, suggested_makam=makam)
-    db.add(new_log)
-    db.commit()
-    return {
-        "hospital": "EVEYES 360",
-        "patient": req.patient_name,
-        "analysis": {
-            "phase_angle": pa,
-            "condition_status": status
-        },
-        "therapy_plan": {
-            "maqam": makam,
-            "aroma": scent,
-            "clinical_note": desc
-        },
-        "scientific_insight": engine_logic.get_scientific_article(req.lang)
-    }
-
-# --- 3. API MODELLEMESİ ---
-app = FastAPI(title="EVEYES 360 Professional API")
-
-class AnalysisRequest(BaseModel):
-    patient_name: str
-    resistance: float
-    reactance: float
-    facial_mood: Optional[str] = "neutral"
-    lang: str = "tr"
-
-# --- 4. API ENDPOINT'LERİ ---
-@app.post("/api/v1/analyze")
-async def perform_analysis(req: AnalysisRequest):
-    db = SessionLocal()
-    final_stress = 0
-    
-    # 1. AI Yüz Analizi Mantığı
-    if req.facial_mood == "anxious":
-        final_stress = 85
-    elif req.facial_mood == "depressed":
-        final_stress = 90
-
-    # 2. Kullanıcı Beyanı (Manuel giriş varsa AI verisini günceller)
-    # Not: Request modelinizde manual_mood_score olduğunu varsayıyoruz
-    if hasattr(req, 'manual_mood_score') and req.manual_mood_score is not None:
-        final_stress = req.manual_mood_score
-
-    # 3. Biyosonoloji Hesaplaması (Faz Açısı)
-    pa = round(math.degrees(math.atan(req.reactance / req.resistance)), 2)
-
-    # 4. Karar Mekanizması (Selçuklu Tıbbı & Biyosonoloji)
-    # Stres yüksekse veya Faz Açısı düşükse (hücresel ödem) Hicaz önerilir
-    if final_stress > 75 or pa < 5.0:
-        therapy = {
-            "makam": "Hicaz",
-            "scent": "Gül Yağı",
-            "info": "Yüksek stres/ödem saptandı. Hicaz makamı ile dengeleme başlatıldı."
-        }
-    else:
-        therapy = {
-            "makam": "Rast",
-            "scent": "Sandal Ağacı",
-            "info": "Hücresel vibrasyon stabil. Rast makamı ile zindelik veriliyor."
-        }
-
-    # 5. Veritabanına Kaydet (Hata Kontrollü)
-    try:
-        new_session = TherapySession(
-            patient_name=req.patient_name,
-            ai_mood=req.facial_mood,
-            phase_angle=pa,
-            selected_makam=therapy["makam"],
-            scent=therapy["scent"]
-        )
-        db.add(new_session)
-        db.commit()
-        db.refresh(new_session)
-    except Exception as e:
-        db.rollback()
-        return {"status": "error", "message": f"DB Hatası: {str(e)}"}
-    finally:
-        db.close()
-
-    # 6. EN SON RETURN (Tüm işlemler bittikten sonra)
-    return {
-        "status": "success",
-        "data": {
-            "patient": req.patient_name,
-            "phase_angle": pa,
-            "final_stress_score": final_stress,
-            "therapy": therapy,
-            "scientific_article": core.get_scientific_article(req.lang)
-        }
-    }
-
-# Tüm dilleri kapsayan veri yapısı
-translations = {
-    "tr": {
-        "welcome": "Hoş geldiniz",
-        "phase_angle": "Faz Açısı",
-        "biosonology": "Biyosonoloji",
-        "seljuk_therapy": "Selçuklu Müzik Terapi"
-    },
-    "en": {
-        "welcome": "Welcome",
-        "phase_angle": "Phase Angle",
-        "biosonology": "Biosonology",
-        "seljuk_therapy": "Seljuk Music Psychotherapy"
-    },
-    "ar": {
-        "welcome": "مرحباً",
-        "phase_angle": "زاوية الطور",
-        "biosonology": "علم البيوسونولوجيا",
-        "seljuk_therapy": "العلاج بالموسيقى في العصر السلجوقي"
-    }
-}
-
-# Kullanıcının seçtiği dil (Dinamik olarak değişebilir)
-current_lang = "tr"
-def get_translation(key):
-    """
-    Belirtilen anahtarın çevirisini döndürür.
-    Eğer dil veya anahtar bulunamazsa, hata vermek yerine anahtarın adını döndürür.
-    """
-    return translations.get(current_lang, {}).get(key, key)
-
-# Kullanım Örnekleri
-print(f"Başlık: {get_translation('welcome')}")
-print(f"Teknik Terim: {get_translation('phase_angle')}")
-
-# Bu yapı veritabanından (PostgreSQL/JSONB) çekilmiş gibi simüle edilmiştir
-therapy_data = {
-    "hicaz_desc": {
-        "tr": "Hicaz makamı ödem atar ve boşaltım sistemini dengeler.",
-        "en": "Hicaz maqam reduces edema and balances the excretory system.",
-        "ru": "Хиджаз макам уменьшает отеки и балансирует выделительную систему.",
-        "ar": "مقام الحجاز يقلل من الوذمة ويوازن الجهاز الإخراجي."
-    },
-    "lavender_oil": {
-        "tr": "Lavanta yağı kortizolü düşürerek hücresel ödemi azaltır.",
-        "en": "Lavender oil reduces cellular edema by lowering cortisol.",
-        "ar": "زيت اللافندر يقلل من الوذمة الخلوية عن طريق خفض الكورتيزول."
-    }
-}
-
-def get_description(data_key, lang="tr"):
-    # İlgili anahtarın seçilen dildeki karşılığını döner, yoksa anahtarın kendisini döner
-    try:
-        return therapy_data[data_key].get(lang, therapy_data[data_key]["en"])
-    except KeyError:
-        return "Data not found."
-
-# Kullanım örneği
-selected_lang = "tr" # Bu değer kullanıcı arayüzünden dinamik gelecek
-print(f"EVEYES 360 Terapi Notu: {get_description('hicaz_desc', selected_lang)}")
 
 class TherapySession(Base):
     __tablename__ = "therapy_sessions"
@@ -335,6 +127,216 @@ class Patient:
         self.tckn = tckn
         self.name = name
         self.reason = reason
+
+# --- 2. ANALİZ MODELLERİ ---
+class AnalysisRequest(BaseModel):
+    patient_name: str
+    resistance: float
+    reactance: float
+    facial_mood: Optional[str] = "neutral"
+    lang: str = "tr"
+# --- 3. CORE LOGIC (Biyosonoloji & Selçuklu Tıbbı) ---
+
+def get_therapy_logic(pa: float, mood: str):
+    """Biyosonoloji verilerini Selçuklu makam terapisiyle eşleştirir."""
+    if pa < 5.0 or mood in ["anxious", "sad"]:
+        return {
+            "makam": "Hicaz", 
+            "scent": "Gül Yağı", 
+            "note": "Hücresel ödem tespiti. Hicaz makamı ve Gül aroması ile dengeleme önerilir."
+        }
+    return {
+        "makam": "Rast", 
+        "scent": "Sandal Ağacı", 
+        "note": "Hücresel vibrasyon stabil. Rast makamı ile zindelik desteklenir."
+    }
+
+async def analyze_condition(req: AnalysisRequest):
+    engine_logic = EVEYES360_Engine()
+# BIA Analizi
+
+    pa = core.analyze_bia(req.resistance, req.reactance)
+    
+    # Diyelim ki BIA ölçümü 4.2 çıktı (Düşük/Ödemli)
+
+    # Terapi Karar Mekanizması
+    if pa < 5.0 or req.facial_mood in ["anxious", "depressed"]:
+        makam, scent = "Hicaz", "Gül Yağı"
+        status = "Kritik (Ödem / Düşük Titreşim)"
+        desc = "Hicaz makamı ve Gül yağı ile hücresel boşaltım ve sakinleşme önerilir."
+    else:
+        makam, scent = "Rast", "Sandal Ağacı"
+        status = "Stabil (Hücresel Denge)"
+        desc = "Rast makamı ve Sandal ağacı ile canlılık ve neşe desteklenir."
+   
+    therapy = core.therapy_db[res_key]
+    selected_makam = therapy["makam"]
+    scent = therapy["scent"]
+    therapy = get_therapy_logic(pa, req.facial_mood)
+    db = SessionLocal()
+    try:
+        new_log = TherapyLog(
+            patient_name=req.patient_name,
+            phase_angle=pa,
+            suggested_makam=makam,
+            scent=scent,
+            status=status
+        )
+        db.add(new_log)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        return {"error": "Veritabanı hatası", "detail": str(e)}
+    finally:
+        db.close()
+    # DB Kayıt
+    db = SessionLocal()
+    new_log = TherapyLog(patient_name=req.patient_name, phase_angle=pa, suggested_makam=makam)
+    db.add(new_log)
+    db.commit()
+    return {
+        "hospital": "EVEYES 360",
+        "patient": req.patient_name,
+        "analysis": {
+            "phase_angle": pa,
+            "condition_status": status
+        },
+        "therapy_plan": {
+            "maqam": makam,
+            "aroma": scent,
+            "clinical_note": desc
+        },
+        "scientific_insight": engine_logic.get_scientific_article(req.lang)
+    }
+
+
+class AnalysisRequest(BaseModel):
+    patient_name: str
+    resistance: float
+    reactance: float
+    facial_mood: Optional[str] = "neutral"
+    lang: str = "tr"
+    
+    # 1. AI Yüz Analizi Mantığı
+    if req.facial_mood == "anxious":
+        final_stress = 85
+    elif req.facial_mood == "depressed":
+        final_stress = 90
+
+    # 2. Kullanıcı Beyanı (Manuel giriş varsa AI verisini günceller)
+    # Not: Request modelinizde manual_mood_score olduğunu varsayıyoruz
+    if hasattr(req, 'manual_mood_score') and req.manual_mood_score is not None:
+        final_stress = req.manual_mood_score
+
+    # 3. Biyosonoloji Hesaplaması (Faz Açısı)
+    pa = round(math.degrees(math.atan(req.reactance / req.resistance)), 2)
+
+    # 4. Karar Mekanizması (Selçuklu Tıbbı & Biyosonoloji)
+    # Stres yüksekse veya Faz Açısı düşükse (hücresel ödem) Hicaz önerilir
+    if final_stress > 75 or pa < 5.0:
+        therapy = {
+            "makam": "Hicaz",
+            "scent": "Gül Yağı",
+            "info": "Yüksek stres/ödem saptandı. Hicaz makamı ile dengeleme başlatıldı."
+        }
+    else:
+        therapy = {
+            "makam": "Rast",
+            "scent": "Sandal Ağacı",
+            "info": "Hücresel vibrasyon stabil. Rast makamı ile zindelik veriliyor."
+        }
+
+    # 5. Veritabanına Kaydet (Hata Kontrollü)
+    try:
+        new_session = TherapySession(
+            patient_name=req.patient_name,
+            ai_mood=req.facial_mood,
+            phase_angle=pa,
+            selected_makam=therapy["makam"],
+            scent=therapy["scent"]
+        )
+        db.add(new_session)
+        db.commit()
+        db.refresh(new_session)
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": f"DB Hatası: {str(e)}"}
+    finally:
+        db.close()
+
+    # 6. EN SON RETURN (Tüm işlemler bittikten sonra)
+    return {
+        "status": "success",
+        "data": {
+            "patient": req.patient_name,
+            "phase_angle": pa,
+            "final_stress_score": final_stress,
+            "therapy": therapy,
+            "scientific_article": core.get_scientific_article(req.lang)
+        }
+    }
+
+def get_description(data_key, lang="tr"):
+    # İlgili anahtarın seçilen dildeki karşılığını döner, yoksa anahtarın kendisini döner
+    try:
+        return therapy_data[data_key].get(lang, therapy_data[data_key]["en"])
+    except KeyError:
+        return "Data not found."
+
+# Kullanım örneği
+selected_lang = "tr" # Bu değer kullanıcı arayüzünden dinamik gelecek
+print(f"EVEYES 360 Terapi Notu: {get_description('hicaz_desc', selected_lang)}")
+# Tüm dilleri kapsayan veri yapısı
+translations = {
+    "tr": {
+        "welcome": "Hoş geldiniz",
+        "phase_angle": "Faz Açısı",
+        "biosonology": "Biyosonoloji",
+        "seljuk_therapy": "Selçuklu Müzik Terapi"
+    },
+    "en": {
+        "welcome": "Welcome",
+        "phase_angle": "Phase Angle",
+        "biosonology": "Biosonology",
+        "seljuk_therapy": "Seljuk Music Psychotherapy"
+    },
+    "ar": {
+        "welcome": "مرحباً",
+        "phase_angle": "زاوية الطور",
+        "biosonology": "علم البيوسونولوجيا",
+        "seljuk_therapy": "العلاج بالموسيقى في العصر السلجوقي"
+    }
+}
+
+# Kullanıcının seçtiği dil (Dinamik olarak değişebilir)
+current_lang = "tr"
+def get_translation(key):
+    """
+    Belirtilen anahtarın çevirisini döndürür.
+    Eğer dil veya anahtar bulunamazsa, hata vermek yerine anahtarın adını döndürür.
+    """
+    return translations.get(current_lang, {}).get(key, key)
+
+# Kullanım Örnekleri
+print(f"Başlık: {get_translation('welcome')}")
+print(f"Teknik Terim: {get_translation('phase_angle')}")
+
+# Bu yapı veritabanından (PostgreSQL/JSONB) çekilmiş gibi simüle edilmiştir
+therapy_data = {
+    "hicaz_desc": {
+        "tr": "Hicaz makamı ödem atar ve boşaltım sistemini dengeler.",
+        "en": "Hicaz maqam reduces edema and balances the excretory system.",
+        "ru": "Хиджаз макам уменьшает отеки и балансирует выделительную систему.",
+        "ar": "مقام الحجاز يقلل من الوذمة ويوازن الجهاز الإخراجي."
+    },
+    "lavender_oil": {
+        "tr": "Lavanta yağı kortizolü düşürerek hücresel ödemi azaltır.",
+        "en": "Lavender oil reduces cellular edema by lowering cortisol.",
+        "ar": "زيت اللافندر يقلل من الوذمة الخلوية عن طريق خفض الكورتيزول."
+    }
+}
+
+
 
 class EVEYES360_System:
     def __init__(self, hospital_name="EVEYES 360 Center"):# Eğer parantez içinde isim varsa onu sil, boş kalsın
