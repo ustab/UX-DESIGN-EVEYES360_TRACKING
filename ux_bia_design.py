@@ -502,65 +502,16 @@ def EVEYES360_Therapy(system_object):
             facial_mood="anxious", 
             phase_angle=4.8, 
             manual_mood_score=None # Buraya rakam girersen otomatik veriyi ezer
-    )
-            print("✨ EVEYES 360 Sistemi Başlatılıyor...")
-            print("🔗 API Dokümantasyonu için: http://127.0.0.1:8000/docs")
-            uvicorn.run(app, host="127.0.0.1", port=8000)
-
-    # Fonksiyonu bu veriyle çağırıyoruz
-            EVEYES360_Analiz_Sistemi(ornek_veri)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# 1. ÖNCE SINIF (Bina Planı)
-class AnalysisRequest(BaseModel):
-    patient_name: str
-    resistance: float
-    reactance: float
-    facial_mood: str
-    phase_angle: float
-    manual_mood_score: Optional[float] = None
-
-# 2. SONRA FONKSİYON (İşçi - Bunu mutlaka 'if __name__' kısmından yukarıya koy)
-def EVEYES360_Rapor_Olustur(req):
-    final_stress = 50 
-    if req.facial_mood == "anxious":
-        final_stress = 90
-    
-    if req.manual_mood_score is not None:
-        final_stress = req.manual_mood_score
-
-    print("\n" + "="*40)
-    print("--- NIZAMIYE HOSPITAL ANALİZ RAPORU ---")
-    print(f"Hasta: {req.patient_name}")
-    print(f"Biyosonolojik Faz Açısı: {req.phase_angle}")
-    print(f"Stres Puanı: {final_stress}")
-    print("="*40)
-    
-    # Selçuklu ve Biyosonoloji akademik notu
-    if final_stress >= 80 or req.phase_angle < 5.0:
-        print("\n[TERAPİ]: Selçuklu Rehavi Makamı önerilir.")
-        print("[NOT]: Biyosonoloji; sesin hücre iyon kanallarına etkisini doğrular.")
-
-# 3. EN SON ÇALIŞTIRMA (Tetikleyici - Her zaman en dipte olmalı)
-if __name__ == "__main__":
-    test_verisi = AnalysisRequest(
+    )   
+        if __name__ == "__main__": test_verisi = AnalysisRequest(
         patient_name="Ahmet Yılmaz",
         resistance=500.0,
         reactance=30.0,
         facial_mood="anxious", 
-        phase_angle=4.8
-    )
-    # Python artık bu ismi yukarıda tanıdığı için hata vermeyecek
-    EVEYES360_Rapor_Olustur(test_verisi)
+        phase_angle=4.8)
+        print("✨ EVEYES 360 Sistemi Başlatılıyor...")
+        print("🔗 API Dokümantasyonu için: http://127.0.0.1:8000/docs")
+        uvicorn.run(app, host="127.0.0.1", port=8000)
+
+    # Fonksiyonu bu veriyle çağırıyoruz
+        EVEYES360_Analiz_Sistemi(ornek_veri)
