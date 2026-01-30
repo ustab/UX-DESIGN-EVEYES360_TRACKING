@@ -1,22 +1,72 @@
 import math
 import json
 import os
-import datetime
-import uvicorn
+import datetime # Sadece datetime olarak import etmek daha güvenlidir
 from typing import Optional, List
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, func, create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+# Diğer importların yanına ForeignKey'i ekleyin
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
+Base = declarative_base()
 
-# --- 1. VERİTABANI AYARLARI ---
-# SQLite kullanarak 'eveyes360.db' adında bir dosya oluşturur.
+class User(Base):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True)
+
+class TherapySession(Base):
+    __tablename__ = 'therapy_sessions'
+    __table_args__ = {'extend_existing': True}
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id")) 
+    patient_name = Column(String)
+    hospital_name = Column(String)     # EVEYES 360 Hastane Kaydı
+    phase_angle = Column(Float)        # Teknik Terim: Faz Açısı
+    cell_melody_data = Column(String)  # Biyosonoloji Verileri
+    seljuk_music_type = Column(String) # Selçuklu Dönemi Müzik 
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    ai_mood = Column(String)  # AI'nın yüz analiz sonucu
+    frequency = Column(Float) # Biosonology verisi
+    selected_makam = Column(String) # Seçilen şifa makamı
+    scent = Column(String) # Eşleşen koku
+    stress_reduction_rate = Column(Float) # Başarı oranı
+    # --- BURAYA YERLEŞTİRİN ---
+    def EVEYES360_Makale_Ozeti_Bas(session_id:int):
+        db = SessionLocal()
+        try:
+            session_data = db.query(TherapySession).filter(TherapySession.id == session_id).first()
+            if not session_data:
+                print("Hata: Belirtilen ID ile bir EVEYES 360 seansı bulunamadı.")
+            makale_metni = f"""
+        --- EVEYES 360 BİLİMSEL ANALİZ RAPORU ---
+        Hastane: {session_data.hospital_name}
+        Teknik Veri (Faz Açısı): {session_data.phase_angle}
+        Biyosonoloji Verisi: {session_data.cell_melody_data}
+        Kullanılan Makam: {session_data.seljuk_music_type}
+        
+        ANALİZ:
+        Hücrelerin biyosonolojik salınımları ve ölçülen {session_data.phase_angle} faz açısı,
+        Selçuklu döneminde uygulanan {session_data.seljuk_music_type} makamı rezonansı ile 
+        uyumluluk göstermektedir. Bu veriler sesin hücresel düzeydeki etkisini kanıtlar.
+        """
+            print(makale_metni)
+        except Exception as e:
+            print(f"Bir hata oluştu: {e}")
+        finally:
+            db.close() 
+
+# --- VERİTABANI OLUŞTURMA VE ÇALIŞTIRMA ---
 DATABASE_URL = "sqlite:///./eveyes360.db"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine) # Düzeltildi: bind=engine aktif edildi
-Base = declarative_base()
-translations = {
+Base.metadata.create_all(bind=engine)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base.metadata.create_all(bind=engine)
+print("EVEYES 360 Veritabanı başarıyla hazırlandı!")
+
+def get_translation(key, lang=None):
+    current_lang = "tr" # Bu değer ileride arayüzden (frontend) gelecek
+    translations = {
     "tr": {
         "welcome": "Hoş geldiniz",
         "phase_angle": "Faz Açısı",
@@ -34,30 +84,10 @@ translations = {
         "phase_angle": "زاوية الطور",
         "seljuk_therapy": "العلاج بالموسيقى في العصر السلجوقي"
     }
-}
-
-current_lang = "tr" # Bu değer ileride arayüzden (frontend) gelecek
-
-def get_translation(key, lang=None):
+}     
     """Sistem genelinde kullanılacak çeviri motoru."""
     target_lang = lang or current_lang
     return translations.get(target_lang, {}).get(key, key)
-# Kullanım Örnekleri
-print(f"Başlık: {get_translation('welcome')}")
-print(f"Teknik Terim: {get_translation('phase_angle')}")
-
-class TherapySession(Base):
-    """Her terapi seansının veritabanındaki kalıcı kaydı."""
-    __tablename__ = "therapy_sessions"
-    id = Column(Integer, primary_key=True, index=True)
-    patient_name = Column(String)
-    ai_mood = Column(String)
-    phase_angle = Column(Float)
-    selected_makam = Column(String)
-    scent = Column(String)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-
-Base.metadata.create_all(bind=engine)   
 
 # --- 2. ANALİZ MODELLERİ ---
 class AnalysisRequest(BaseModel):
@@ -92,11 +122,6 @@ class AnalysisRequest(BaseModel):
         else:
             print("\n[TERAPİ ÖNERİSİ]: 'Rast' Makamı ile dengeleme.")
 
-
-    # --- ÇALIŞTIRMA KOMUTLARI ---
-    # Örnek bir veri oluşturup fonksiyonu çağırıyoruz
-
-
 if __name__ == "__main__":
     # Pydantic artık bu 5 veriyi de zorunlu kılıyor:
     test_verisi = AnalysisRequest(
@@ -106,8 +131,6 @@ if __name__ == "__main__":
         facial_mood="anxious", 
         phase_angle=4.8
     )
-    EVEYES360_Rapor_Olustur(test_verisi)
-
     def calculate_final_stress(self):
         # Varsayılan değer
         final_stress = 50 
@@ -122,20 +145,18 @@ if __name__ == "__main__":
         # 2. Manuel müdahale kontrolü (Senin eklemek istediğin kısım)
         elif self.manual_mood_score is not None:
             final_stress = self.manual_mood_score
-            
-        return final_stress
-        # SONUÇ VE TERAPİ PLANI
-    print(f"\n--- NIZAMIYE HOSPITAL ANALİZ RAPORU ---")
-    print(f"Biyosonolojik Faz Açısı: {self.phase_angle}")
-    print(f"Hesaplanan Stres Puanı: {final_stress}")
+       
+            print(f"\n--- NIZAMIYE HOSPITAL ANALİZ RAPORU ---")
+            print(f"Biyosonolojik Faz Açısı: {self.phase_angle}")
+            print(f"Hesaplanan Stres Puanı: {final_stress}")
 
     # Selçuklu ve Biyosonoloji Entegrasyonu
-    if final_stress >= 80 or req.phase_angle < 5.0:
-        print("\n[TERAPİ ÖNERİSİ]: Selçuklu Dönemi 'Rehavi' Makamı.")
-        print("[BİLİMSEL DAYANAK]: Biyosonoloji verileri hücre içi düşük enerji tespit etti.")
-        print("[AKADEMİK NOT]: Ses frekansları hücre zarındaki iyon kanallarını stimüle eder.")
-    else:
-        print("\n[TERAPİ ÖNERİSİ]: 'Rast' Makamı ile genel dengeleme.")
+        if final_stress >= 80 or req.phase_angle < 5.0:
+            print("\n[TERAPİ ÖNERİSİ]: Selçuklu Dönemi 'Rehavi' Makamı.")
+            print("[BİLİMSEL DAYANAK]: Biyosonoloji verileri hücre içi düşük enerji tespit etti.")
+            print("[AKADEMİK NOT]: Ses frekansları hücre zarındaki iyon kanallarını stimüle eder.")
+        else:
+            print("\n[TERAPİ ÖNERİSİ]: 'Rast' Makamı ile genel dengeleme.")
 class EVEYES360_Engine:
     """Biyosonoloji ve Selçuklu Tıbbı kararlarını veren beyin."""
     def __init__(self, hospital_name="EVEYES 360 Center"):
@@ -265,18 +286,6 @@ class EVEYES360_Biosonology:
     def __init__(self, hospital_name):
         self.hospital_name = hospital_name
         self.article = "Biyosonoloji ve Selçuklu tıbbı üzerine makale..."
-class TherapySession(Base):
-    __tablename__ = "therapy_sessions"
-    __table_args__ = {'extend_existing': True} 
-    patient_name = Column(String)
-    #id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    ai_mood = Column(String)  # AI'nın yüz analiz sonucu
-    frequency = Column(Float) # Biosonology verisi
-    selected_makam = Column(String) # Seçilen şifa makamı
-    scent = Column(String) # Eşleşen koku
-    stress_reduction_rate = Column(Float) # Başarı oranı
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     # Fonksiyonu şöyle tanımla:
 class EVEYES360_Therapy:
@@ -515,3 +524,54 @@ def EVEYES360_Therapy(system_object):
 
     # Fonksiyonu bu veriyle çağırıyoruz
         EVEYES360_Analiz_Sistemi(ornek_veri)
+
+        if __name__ == "__main__":
+            print("\n--- EVEYES 360 SİSTEMİ BAŞLATILIYOR ---")
+    # Buraya birazdan veri ekleme kodunu yazacağız.
+        db = SessionLocal() # Kapıyı açtık
+        yeni_kayit = TherapySession(
+        patient_name="Örnek Hasta",
+        hospital_name="EVEYES 360 Hastanesi", # Hastane adını sabitledik
+        phase_angle=6.2,                      # Teknik Faz Açısı verisi
+        cell_melody_data="Hücresel Rezonans: 440Hz", # Biyosonoloji
+        seljuk_music_type="Nihavend Makamı",   # Selçuklu dönemi referansı
+        ai_mood="Dengeli"
+    ) 
+        db.add(yeni_kayit)
+        db.commit() # Veritabanına kalıcı olarak yazıldı
+        db.refresh(yeni_kayit) # ID numarasını aldık
+
+        # ŞİMDİ MAKALE ÖZETİNİ EKRANA BASALIM
+        EVEYES360_Makale_Ozeti_Bas(yeni_kayit.id)
+    
+        db.close() # Kapıyı kapattık
+        
+        # --- 5. MAKALE ÇIKTISINI ALMA ---
+
+        if __name__ == "__main__":
+    # 1. Önce veritabanı bağlantısını açıyoruz
+            db = SessionLocal()
+        try:
+    # 2. Veritabanına senin projenin kalbi olan o veriyi ekliyoruz
+            test_seansi = TherapySession(
+            patient_name="Deneme Kullanıcısı",
+            hospital_name="EVEYES 360 Hastanesi",
+            phase_angle=5.75,
+            cell_melody_data="Hücresel Titreşim (Biyosonoloji Verisi)",
+            seljuk_music_type="Rast Makamı (Selçuklu Psikoterapisi)",
+            ai_mood="Pozitif"
+        )
+        
+            db.add(test_seansi)
+            db.commit() # Veritabanına kaydettik
+            db.refresh(test_seansi) # Sistemin verdiği ID'yi aldık
+
+        # 3. İŞTE BURASI MAKALE ÇIKTISINI VEREN KOMUT:
+            print("\n" + "="*40)
+            EVEYES360_Makale_Ozeti_Bas(test_seansi.id)
+            print("="*40)
+
+        except Exception as e:
+            print(f"Hata oluştu: {e}")
+        finally:
+            db.close()
